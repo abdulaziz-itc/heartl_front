@@ -19,7 +19,7 @@ interface CreateMedRepModalProps {
 }
 
 export function CreateMedRepModal({ isOpen, onClose, onSuccess, rmList }: CreateMedRepModalProps) {
-    const { regions, fetchRegions } = useRegionStore();
+    const { fetchRegions } = useRegionStore();
     const [isLoading, setIsLoading] = React.useState(false);
     const [formData, setFormData] = React.useState({
         full_name: '',
@@ -35,6 +35,20 @@ export function CreateMedRepModal({ isOpen, onClose, onSuccess, rmList }: Create
         }
     }, [isOpen, fetchRegions]);
 
+    // Automatically set region_id when manager_id changes
+    useEffect(() => {
+        if (formData.manager_id) {
+            const selectedManager = rmList.find(rm => rm.id === parseInt(formData.manager_id));
+            if (selectedManager && selectedManager.region_id) {
+                setFormData(prev => ({ ...prev, region_id: String(selectedManager.region_id) }));
+            } else {
+                setFormData(prev => ({ ...prev, region_id: '' }));
+            }
+        } else {
+            setFormData(prev => ({ ...prev, region_id: '' }));
+        }
+    }, [formData.manager_id, rmList]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -45,7 +59,7 @@ export function CreateMedRepModal({ isOpen, onClose, onSuccess, rmList }: Create
                 password: formData.password,
                 role: 'med_rep',
                 manager_id: parseInt(formData.manager_id),
-                region_id: parseInt(formData.region_id),
+                region_id: formData.region_id ? parseInt(formData.region_id) : undefined,
             });
             onSuccess();
             onClose();
@@ -125,24 +139,6 @@ export function CreateMedRepModal({ isOpen, onClose, onSuccess, rmList }: Create
                                 <option value="">Выберите менеджера</option>
                                 {rmList.map(rm => (
                                     <option key={rm.id} value={rm.id}>{rm.full_name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="region_id" className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                Регион
-                            </Label>
-                            <select
-                                id="region_id"
-                                className="w-full h-12 px-3 rounded-xl border border-slate-200 focus:border-blue-500 transition-all font-medium text-sm"
-                                value={formData.region_id}
-                                onChange={(e) => setFormData({ ...formData, region_id: e.target.value })}
-                                required
-                            >
-                                <option value="">Выберите регион</option>
-                                {regions.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
                                 ))}
                             </select>
                         </div>
