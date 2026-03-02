@@ -1,5 +1,5 @@
 import { type ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { MoreHorizontal, Edit, Trash2, ArrowRightLeft } from "lucide-react"
 import { Button } from "../../components/ui/button"
 import {
     DropdownMenu,
@@ -18,7 +18,8 @@ export interface SubordinateUser {
 }
 
 export const getSubordinateColumns = (
-    onEdit: (user: SubordinateUser) => void
+    onEdit: (user: SubordinateUser) => void,
+    onTransfer?: (user: SubordinateUser) => void
 ): ColumnDef<SubordinateUser>[] => [
         {
             id: "index",
@@ -77,6 +78,16 @@ export const getSubordinateColumns = (
                                 <Edit className="mr-2 h-4 w-4" />
                                 <span className="font-medium">Редактировать</span>
                             </DropdownMenuItem>
+
+                            {onTransfer && (
+                                <DropdownMenuItem
+                                    onClick={() => onTransfer(user)}
+                                    className="rounded-xl focus:bg-purple-50 focus:text-purple-600 cursor-pointer transition-colors px-3 py-2.5"
+                                >
+                                    <ArrowRightLeft className="mr-2 h-4 w-4 text-purple-500" />
+                                    <span className="font-medium text-purple-600">Передать полномочия</span>
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )

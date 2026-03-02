@@ -2,7 +2,18 @@ import { type ColumnDef } from "@tanstack/react-table"
 import { Link } from "react-router-dom"
 import type { ProductManager } from "../../store/productManagerStore"
 
-export const columns: ColumnDef<ProductManager>[] = [
+import { MoreHorizontal, ArrowRightLeft } from "lucide-react"
+import { Button } from "../../components/ui/button"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu"
+
+export const getManagerColumns = (onTransfer?: (user: ProductManager) => void): ColumnDef<ProductManager>[] => [
     {
         id: "index",
         header: "#",
@@ -41,5 +52,38 @@ export const columns: ColumnDef<ProductManager>[] = [
             </span>
         ),
         cell: ({ row }) => <span className="font-bold text-slate-700">{row.getValue("role")}</span>,
+    },
+    {
+        id: "actions",
+        cell: ({ row }) => {
+            const user = row.original
+
+            if (!onTransfer) return null;
+
+            return (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg transition-colors">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4 text-slate-400" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 rounded-2xl border-none shadow-xl shadow-slate-200/50 p-2">
+                        <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2 py-1.5">
+                            Действия
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="bg-slate-100 my-1" />
+
+                        <DropdownMenuItem
+                            onClick={() => onTransfer(user)}
+                            className="rounded-xl focus:bg-purple-50 focus:text-purple-600 cursor-pointer transition-colors px-3 py-2.5"
+                        >
+                            <ArrowRightLeft className="mr-2 h-4 w-4 text-purple-500" />
+                            <span className="font-medium text-purple-600">Передать полномочия</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )
+        },
     },
 ]
