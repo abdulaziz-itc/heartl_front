@@ -63,9 +63,10 @@ interface MedRepDoctorsTableProps {
     data: any[];
     salesPlans: any[];
     salesFacts: any[];
+    bonusPayments?: any[];
 }
 
-export function MedRepDoctorsTable({ data, salesPlans, salesFacts }: MedRepDoctorsTableProps) {
+export function MedRepDoctorsTable({ data, salesPlans, salesFacts, bonusPayments = [] }: MedRepDoctorsTableProps) {
     const [isAddOpen, setIsAddOpen] = React.useState(false);
     const [selectedDoctor, setSelectedDoctor] = React.useState<any>(null);
     const [isEditMode, setIsEditMode] = React.useState(false);
@@ -117,6 +118,7 @@ export function MedRepDoctorsTable({ data, salesPlans, salesFacts }: MedRepDocto
                 doctor={selectedDoctor?.rawDoctor}
                 salesPlans={salesPlans}
                 salesFacts={salesFacts}
+                bonusPayments={bonusPayments}
                 defaultEditMode={isEditMode}
             />
         </div>

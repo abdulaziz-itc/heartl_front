@@ -12,10 +12,11 @@ interface DoctorDetailModalProps {
     doctor: any;
     salesPlans: any[];
     salesFacts: any[];
+    bonusPayments?: any[];
     defaultEditMode?: boolean;
 }
 
-export function DoctorDetailModal({ isOpen, onClose, onSuccess, doctor, salesPlans, salesFacts, defaultEditMode = false }: DoctorDetailModalProps) {
+export function DoctorDetailModal({ isOpen, onClose, onSuccess, doctor, salesPlans, salesFacts, bonusPayments = [], defaultEditMode = false }: DoctorDetailModalProps) {
     const [isEditing, setIsEditing] = React.useState(false);
     const [editData, setEditData] = React.useState<any>({});
     const [isSaving, setIsSaving] = React.useState(false);
@@ -56,6 +57,7 @@ export function DoctorDetailModal({ isOpen, onClose, onSuccess, doctor, salesPla
     // Filter plans and facts for this specific doctor
     const doctorPlans = salesPlans.filter(p => p.doctor?.id === doctor.id);
     const doctorFacts = salesFacts?.filter(f => f.doctor_id === doctor.id) || [];
+    const doctorBonuses = bonusPayments.filter(b => b.doctor_id === doctor.id);
 
     // Group matching facts for this doctor
     const productStats = new Map<number, {
@@ -332,6 +334,43 @@ export function DoctorDetailModal({ isOpen, onClose, onSuccess, doctor, salesPla
                                 )}
                             </div>
                         </div>
+
+                        {/* Bonuses Section */}
+                        {doctorBonuses.length > 0 && (
+                            <div className="bg-white p-8 rounded-[36px] border border-slate-100 shadow-sm flex flex-col xl:col-span-2">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+                                    Прединвестиции и Бонусы
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {doctorBonuses.map((bonus, idx) => (
+                                        <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-blue-50/50 hover:bg-blue-50 transition-all">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="font-bold text-slate-900 text-sm">
+                                                    {bonus.amount.toLocaleString()} UZS
+                                                </h4>
+                                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                                                    {bonus.paid_date ? new Date(bonus.paid_date).toLocaleDateString('ru-RU') : "—"}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs font-medium text-slate-600 mb-2">
+                                                Период: <span className="font-bold text-slate-800">{bonus.for_month}/{bonus.for_year}</span>
+                                            </div>
+                                            {bonus.product && (
+                                                <div className="text-xs font-medium text-slate-600 mb-2">
+                                                    Препарат: <span className="font-bold text-slate-800">{bonus.product.name}</span>
+                                                </div>
+                                            )}
+                                            {bonus.notes && (
+                                                <div className="text-[10px] font-medium text-slate-500 bg-white p-2 rounded-lg mt-2 border border-blue-100/50">
+                                                    {bonus.notes}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </DialogContent>

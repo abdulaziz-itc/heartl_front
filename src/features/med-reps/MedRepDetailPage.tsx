@@ -190,6 +190,7 @@ export default function MedRepDetailPage() {
                         }))}
                         salesPlans={salesPlans}
                         salesFacts={salesFacts} // Pass facts down here
+                        bonusPayments={bonusPayments}
                     />
                 </div>
 
