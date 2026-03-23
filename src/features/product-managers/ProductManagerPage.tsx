@@ -7,17 +7,44 @@ import { PageHeader } from '../../components/PageHeader';
 import AddProductManagerModal from './AddProductManagerModal';
 import { useAuthStore } from '../../store/authStore';
 import { ReassignUserModal } from '../med-reps/ReassignUserModal';
+import { EditManagerModal } from './EditManagerModal';
+import { toast } from 'sonner';
 
 export default function ProductManagerPage() {
     const { productManagers, fetchProductManagers } = useProductManagerStore();
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [transferUser, setTransferUser] = React.useState<ProductManager | null>(null);
+    const [editingManager, setEditingManager] = React.useState<ProductManager | null>(null);
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
 
     const currentUser = useAuthStore((state) => state.user);
     const canReassign = currentUser?.role && ['admin', 'director', 'deputy_director'].includes(currentUser.role);
 
+    const handleToggleActive = async (user: ProductManager) => {
+        try {
+            setIsSubmitting(true);
+            const api = (await import('../../api/axios')).default;
+            await api.put(`/users/${user.id}`, {
+                is_active: user.is_active === false ? true : false
+            });
+            await fetchProductManagers();
+            toast.success("Статус успешно изменен.");
+        } catch (error: any) {
+            console.error("Failed to toggle active status:", error);
+            if (error.response?.data?.detail) {
+                toast.error(error.response.data.detail);
+            } else {
+                toast.error("Ошибка при изменении статуса.");
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const columns = React.useMemo(() => getManagerColumns(
-        canReassign ? (user) => setTransferUser(user) : undefined
+        canReassign ? (user) => setTransferUser(user) : undefined,
+        canReassign ? handleToggleActive : undefined,
+        canReassign ? (user) => setEditingManager(user) : undefined
     ), [canReassign]);
 
     React.useEffect(() => {
@@ -51,6 +78,13 @@ export default function ProductManagerPage() {
                 fromUserId={transferUser?.id || 0}
                 fromUserName={transferUser?.full_name || "Unknown"}
                 role={transferUser?.role || "product_manager"}
+            />
+
+            <EditManagerModal
+                isOpen={!!editingManager}
+                onClose={() => setEditingManager(null)}
+                manager={editingManager}
+                onSuccess={() => fetchProductManagers()}
             />
         </PageContainer>
     );

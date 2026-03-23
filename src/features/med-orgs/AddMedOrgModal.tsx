@@ -54,6 +54,7 @@ export function AddMedOrgModal({ isOpen, onClose, defaultRepId, defaultOrgType }
     const [name, setName] = useState("");
     const [orgType, setOrgType] = useState(defaultOrgType || "pharmacy");
     const [brand, setBrand] = useState("");
+    const [inn, setInn] = useState("");
     const [contactPhone, setContactPhone] = useState("");
     const [assignedRepId, setAssignedRepId] = useState(defaultRepId || "");
     const [regionId, setRegionId] = useState("");
@@ -70,8 +71,8 @@ export function AddMedOrgModal({ isOpen, onClose, defaultRepId, defaultOrgType }
     }, [isOpen, fetchRegions, fetchMedReps]);
 
     const handleSubmit = async () => {
-        if (!name || !regionId) {
-            alert("Пожалуйста, заполните обязательные поля (Название и Регион)");
+        if (!name || !regionId || !inn) {
+            alert("Пожалуйста, заполните обязательные поля: Название, ИНН и Регион");
             return;
         }
 
@@ -80,6 +81,7 @@ export function AddMedOrgModal({ isOpen, onClose, defaultRepId, defaultOrgType }
             await createMedOrg({
                 name,
                 org_type: orgType,
+                inn,
                 brand: brand || undefined,
                 contact_phone: contactPhone || undefined,
                 assigned_rep_ids: assignedRepId ? [parseInt(assignedRepId)] : [],
@@ -92,6 +94,7 @@ export function AddMedOrgModal({ isOpen, onClose, defaultRepId, defaultOrgType }
             setName("");
             setOrgType(defaultOrgType || "pharmacy");
             setBrand("");
+            setInn("");
             setContactPhone("");
             setAssignedRepId(defaultRepId || "");
             setRegionId("");
@@ -153,6 +156,7 @@ export function AddMedOrgModal({ isOpen, onClose, defaultRepId, defaultOrgType }
                                         <SelectItem value="clinic" className="font-bold cursor-pointer rounded-xl mx-1 my-0.5 focus:bg-blue-50 focus:text-blue-600">Клиника</SelectItem>
                                         <SelectItem value="hospital" className="font-bold cursor-pointer rounded-xl mx-1 my-0.5 focus:bg-blue-50 focus:text-blue-600">Больница / Госпиталь</SelectItem>
                                         <SelectItem value="lechebniy" className="font-bold cursor-pointer rounded-xl mx-1 my-0.5 focus:bg-blue-50 focus:text-blue-600">Лечебное Учреждение</SelectItem>
+                                        <SelectItem value="wholesale" className="font-bold cursor-pointer rounded-xl mx-1 my-0.5 focus:bg-blue-50 focus:text-blue-600 text-indigo-600">Оптовая компания / Дистрибьютор</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -190,6 +194,17 @@ export function AddMedOrgModal({ isOpen, onClose, defaultRepId, defaultOrgType }
                                     value={brand}
                                     onChange={(e) => setBrand(e.target.value)}
                                     className="pl-4 h-12 bg-slate-50 border-slate-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 rounded-2xl transition-all shadow-none font-bold text-slate-800"
+                                />
+                            </div>
+
+                            <div className="relative group flex items-center">
+                                <Building2 className="w-4 h-4 text-slate-400 absolute left-4" />
+                                <Label className="sr-only">ИНН (Обязательно)</Label>
+                                <Input
+                                    placeholder="ИНН *"
+                                    value={inn}
+                                    onChange={(e) => setInn(e.target.value)}
+                                    className="pl-10 h-12 bg-slate-50 border-slate-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 rounded-2xl transition-all shadow-none font-bold text-slate-800"
                                 />
                             </div>
 

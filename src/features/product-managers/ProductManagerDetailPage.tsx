@@ -14,6 +14,7 @@ import { Button } from '../../components/ui/button';
 import { ArrowRightLeft } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { ReassignUserModal } from '../med-reps/ReassignUserModal';
+import { toast } from 'sonner';
 
 export default function ProductManagerDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -26,6 +27,8 @@ export default function ProductManagerDetailPage() {
     const [transferUser, setTransferUser] = React.useState<SubordinateUser | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const currentUser = useAuthStore((state) => state.user);
+
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
 
     // Check if current user has permission to reassign
     const canReassign = currentUser?.role && ['admin', 'director', 'deputy_director'].includes(currentUser.role);
@@ -48,10 +51,32 @@ export default function ProductManagerDetailPage() {
         fetchHierarchy();
     }, [fetchHierarchy]);
 
+    const handleToggleActive = async (user: SubordinateUser) => {
+        try {
+            setIsSubmitting(true);
+            const api = (await import('../../api/axios')).default;
+            await api.put(`/users/${user.id}`, {
+                is_active: user.is_active === false ? true : false
+            });
+            await fetchHierarchy();
+            toast.success("Статус успешно изменен.");
+        } catch (error: any) {
+            console.error("Failed to toggle active status:", error);
+            if (error.response?.data?.detail) {
+                toast.error(error.response.data.detail);
+            } else {
+                toast.error("Ошибка при изменении статуса.");
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const columns = React.useMemo(() => getSubordinateColumns(
         (user) => setEditingUser(user),
-        canReassign ? (user) => setTransferUser(user) : undefined
-    ), [canReassign]);
+        canReassign ? (user) => setTransferUser(user) : undefined,
+        canReassign ? handleToggleActive : undefined
+    ), [canReassign, fetchHierarchy]);
 
     if (isLoading) {
         return (

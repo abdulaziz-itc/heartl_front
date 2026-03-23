@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Doctor } from '../../store/doctorStore';
 import { getPlans, getDoctorFacts, getBonusPayments } from '../../api/sales';
+import { useProductStore } from '../../store/productStore';
 
 interface DoctorRowExpandedProps {
     doctor: Doctor;
@@ -14,7 +15,9 @@ interface ProductRow {
     planQty: number;
     planSum: number;
     factQty: number;
-    bonusPaid: number;
+    bonusFactLabel?: string; // Not strictly needed but for clarity
+    bonusFact: number;
+    bonusPred: number;
 }
 
 interface BonusRow {
@@ -33,10 +36,21 @@ const MONTHS_RU = [
 ];
 
 export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProps) {
+    const { products } = useProductStore();
     const [rows, setRows] = React.useState<ProductRow[]>([]);
     const [bonusRows, setBonusRows] = React.useState<BonusRow[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [tab, setTab] = React.useState<'plans' | 'bonuses'>('plans');
+
+    // Bonus history filter
+    const [bonusShowAll, setBonusShowAll] = React.useState(true);
+    const [bonusFilterMonth, setBonusFilterMonth] = React.useState(new Date().getMonth() + 1);
+    const [bonusFilterYear, setBonusFilterYear] = React.useState(new Date().getFullYear());
+
+    const filteredBonusRows = React.useMemo(() => {
+        if (bonusShowAll) return bonusRows;
+        return bonusRows.filter(b => b.for_month === bonusFilterMonth && b.for_year === bonusFilterYear);
+    }, [bonusRows, bonusShowAll, bonusFilterMonth, bonusFilterYear]);
 
     React.useEffect(() => {
         const load = async () => {
@@ -89,7 +103,9 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
                 for (const f of facts) {
                     const pid = f.product_id;
                     if (!pid) continue;
-                    if (f.date) {
+                    if (f.month !== undefined && f.year !== undefined) {
+                        if (f.month !== month || f.year !== year) continue;
+                    } else if (f.date) {
                         const d = new Date(f.date);
                         if (d.getMonth() + 1 !== month || d.getFullYear() !== year) continue;
                     }
@@ -99,16 +115,34 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
                 const productIds = [...new Set([
                     ...Object.keys(planMap).map(Number),
                     ...Object.keys(factMap).map(Number),
+                    ...Object.keys(bonusByProduct).map(Number),
                 ])];
 
-                setRows(productIds.map(pid => ({
-                    productId: pid,
-                    productName: planMap[pid]?.name ?? `Продукт #${pid}`,
-                    planQty: planMap[pid]?.planQty ?? 0,
-                    planSum: planMap[pid]?.planSum ?? 0,
-                    factQty: factMap[pid] ?? 0,
-                    bonusPaid: bonusByProduct[pid] ?? 0,
-                })));
+                setRows(productIds.map(pid => {
+                    const bonusPaid = bonusByProduct[pid] ?? 0;
+
+                    // Calculate fact part for this specific month/year/product
+                    // We need marketing expense for this product.
+                    // If we have a plan, we can get it from there. 
+                    // Otherwise we might need to look it up in products list, but plans usually have it.
+                    const plan = sortedPlans.find((p: any) => (p.product_id ?? p.product?.id) === pid);
+                    const pStore = products.find(p => p.id === pid);
+                    const rate = plan?.product?.marketing_expense || pStore?.marketing_expense || 0;
+                    const earned = (factMap[pid] ?? 0) * rate;
+
+                    const bonusFact = Math.min(bonusPaid, earned);
+                    const bonusPred = Math.max(0, bonusPaid - earned);
+
+                    return {
+                        productId: pid,
+                        productName: planMap[pid]?.name ?? `Продукт #${pid}`,
+                        planQty: planMap[pid]?.planQty ?? 0,
+                        planSum: planMap[pid]?.planSum ?? 0,
+                        factQty: factMap[pid] ?? 0,
+                        bonusFact: bonusFact,
+                        bonusPred: bonusPred,
+                    };
+                }));
             } catch (e) {
                 console.error('DoctorRowExpanded fetch error', e);
             } finally {
@@ -116,10 +150,10 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
             }
         };
         load();
-    }, [doctor.id, month, year]);
+    }, [doctor.id, month, year, products]);
 
     const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(n);
-    const totalBonus = bonusRows.reduce((s, b) => s + b.amount, 0);
+    const totalBonus = filteredBonusRows.reduce((s, b) => s + b.amount, 0);
 
     return (
         <div className="bg-slate-50/50 p-6 shadow-inner border-y border-slate-100">
@@ -171,9 +205,11 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
                                         <th className="px-6 py-3.5">Препарат</th>
                                         <th className="px-6 py-3.5 text-right">Мес. план (уп.)</th>
                                         <th className="px-6 py-3.5 text-right">Мес. план (сум)</th>
-                                        <th className="px-6 py-3.5 text-right">Факт (уп.)</th>
-                                        <th className="px-6 py-3.5 text-right">Выполн. %</th>
-                                        <th className="px-6 py-3.5 text-right">Предынвест</th>
+                                        <th className="px-6 py-3.5 text-right w-24">Мес. план (бонус)</th>
+                                        <th className="px-6 py-3.5 text-right w-24">Факт (уп.)</th>
+                                        <th className="px-6 py-3.5 text-right w-20">Выполн. %</th>
+                                        <th className="px-6 py-3.5 text-right w-28 text-emerald-600">Бонус (факт)</th>
+                                        <th className="px-6 py-3.5 text-right w-28 text-amber-600">Предынвест</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -185,13 +221,23 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
                                                 <td className="px-6 py-4 font-bold text-slate-700 text-sm">{p.productName}</td>
                                                 <td className="px-6 py-4 text-right font-bold text-slate-900 text-sm">{fmt(p.planQty)}</td>
                                                 <td className="px-6 py-4 text-right font-semibold text-slate-500 text-sm">{fmt(p.planSum)}</td>
+                                                <td className="px-6 py-4 text-right font-semibold text-slate-500 text-sm">
+                                                    {p.planQty > 0 ? (
+                                                        <span className="text-slate-400 font-medium">{fmt(Math.round(p.planQty * (p.bonusFact / (p.factQty || 1) || 20000)))}</span>
+                                                    ) : "—"}
+                                                </td>
                                                 <td className="px-6 py-4 text-right font-bold text-slate-900 text-sm">{fmt(p.factQty)}</td>
                                                 <td className="px-6 py-4 text-right">
                                                     <span className={`text-xs font-bold ${pct >= 100 ? 'text-emerald-600' : pct < 50 ? 'text-rose-500' : 'text-amber-500'}`}>{pct}%</span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    {p.bonusPaid > 0 ? (
-                                                        <span className="inline-flex px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-100">{fmt(p.bonusPaid)}</span>
+                                                    {p.bonusFact > 0 ? (
+                                                        <span className="inline-flex px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-100">{fmt(p.bonusFact)}</span>
+                                                    ) : <span className="text-slate-300 text-xs">—</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {p.bonusPred > 0 ? (
+                                                        <span className="inline-flex px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-100">{fmt(p.bonusPred)}</span>
                                                     ) : <span className="text-slate-300 text-xs">—</span>}
                                                 </td>
                                             </tr>
@@ -207,11 +253,44 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
                         <div className="p-8 text-center text-sm text-slate-400 font-medium">Нет бонусных выплат для данного врача</div>
                     ) : (
                         <div>
+                            {/* Filter controls */}
+                            <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-2 flex-wrap bg-white">
+                                <button
+                                    onClick={() => setBonusShowAll(prev => !prev)}
+                                    className={`h-7 px-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${bonusShowAll
+                                        ? 'bg-fuchsia-600 text-white border-fuchsia-600'
+                                        : 'bg-white text-slate-500 border-slate-200 hover:border-fuchsia-300'
+                                        }`}
+                                >
+                                    За всё время
+                                </button>
+                                {!bonusShowAll && (
+                                    <>
+                                        <select
+                                            className="h-7 px-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/30"
+                                            value={bonusFilterMonth}
+                                            onChange={(e) => setBonusFilterMonth(parseInt(e.target.value))}
+                                        >
+                                            {MONTHS_RU.map((m, i) => (
+                                                <option key={i + 1} value={i + 1}>{m}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            className="h-7 w-16 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-600 text-center focus:outline-none focus:ring-2 focus:ring-fuchsia-400/30"
+                                            value={bonusFilterYear}
+                                            onChange={(e) => setBonusFilterYear(parseInt(e.target.value) || new Date().getFullYear())}
+                                        />
+                                    </>
+                                )}
+                            </div>
                             {/* Total strip */}
                             <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-4 bg-fuchsia-50/50">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Итого выплачено</span>
                                 <span className="text-base font-black text-fuchsia-700">{fmt(totalBonus)} UZS</span>
-                                <span className="ml-2 text-[10px] font-semibold text-slate-400">за все периоды</span>
+                                <span className="ml-2 text-[10px] font-semibold text-slate-400">
+                                    {bonusShowAll ? 'за все периоды' : `${MONTHS_RU[bonusFilterMonth - 1]} ${bonusFilterYear}`}
+                                </span>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-auto min-w-full text-sm text-left table-auto">
@@ -232,7 +311,7 @@ export function DoctorRowExpanded({ doctor, month, year }: DoctorRowExpandedProp
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {bonusRows.map(b => (
+                                        {filteredBonusRows.map(b => (
                                             <tr key={b.id} className="hover:bg-fuchsia-50/20 transition-colors">
                                                 <td className="px-3 py-3">
                                                     <span className="font-bold text-fuchsia-700 text-xs">

@@ -3,7 +3,7 @@ import {
     Dialog,
     DialogContent,
 } from "../../components/ui/dialog";
-import { Building2, MapPin, User, Globe, Tag, Info, X, Edit2, Check, Package, Users, Phone } from "lucide-react";
+import { Building2, MapPin, User, Globe, Tag, Info, X, Edit2, Check, Package, Users, Phone, ShoppingCart } from "lucide-react";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { getDoctors, updateDoctor } from "../../api/crm";
 import { DoctorDetailModal } from "../med-reps/components/DoctorDetailModal";
 import { getPlans, getSaleFacts, getBonusPayments } from "../../api/sales";
+import { CreateReservationModal } from "../head-of-orders/CreateReservationModal";
+import { useAuthStore } from "../../store/authStore";
 
 // Fix Leaflet icon issue
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -30,9 +32,10 @@ interface MedOrgDetailModalProps {
     org: MedicalOrganization | null;
     isOpen: boolean;
     onClose: () => void;
+    readOnly?: boolean;
 }
 
-export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalProps) {
+export function MedOrgDetailModal({ org, isOpen, onClose, readOnly = false }: MedOrgDetailModalProps) {
     const { updateMedOrg, fetchOrgStock, fetchOrgDoctors } = useMedOrgStore();
 
     const [isEditing, setIsEditing] = useState(false);
@@ -53,6 +56,8 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
     const [viewDoctorFacts, setViewDoctorFacts] = useState<any[]>([]);
     const [viewDoctorBonuses, setViewDoctorBonuses] = useState<any[]>([]);
     const [isLoadingDocView, setIsLoadingDocView] = useState(false);
+    const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+    const [geocodedAddress, setGeocodedAddress] = useState<string | null>(null);
 
     useEffect(() => {
         if (org && isOpen) {
@@ -63,15 +68,35 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                 brand: org.brand || '',
                 contact_phone: org.contact_phone || '',
                 director_name: org.director_name || '',
+                inn: org.inn || '',
             });
             setIsEditing(false);
 
+            // Reverse geocode lat/lng if present
+            if (org.latitude && org.longitude) {
+                setGeocodedAddress(null);
+                fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${org.latitude}&lon=${org.longitude}&accept-language=uz,ru`,
+                    { headers: { 'Accept-Language': 'uz,ru' } }
+                )
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.display_name) setGeocodedAddress(data.display_name);
+                    })
+                    .catch(() => { });
+            } else {
+                setGeocodedAddress(null);
+            }
+
             // Fetch extra data
             setIsLoadingData(true);
+            const user = useAuthStore.getState().user;
+            const doctorParams = (user?.role?.toLowerCase() === 'med_rep' || user?.role?.toLowerCase() === 'regional_manager') ? { rep_id: user.id } : {};
+
             Promise.all([
                 fetchOrgStock(org.id),
                 fetchOrgDoctors(org.id),
-                getDoctors()
+                getDoctors(doctorParams)
             ]).then(([stockData, docsData, allDocsData]) => {
                 setStock(stockData);
                 setDoctors(docsData);
@@ -150,31 +175,33 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                 {/* Header Section */}
                 <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 p-10 pb-20 shrink-0">
                     <div className="absolute top-6 right-6 flex gap-2">
-                        {!isEditing ? (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="p-2 rounded-full bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 hover:text-white transition-all flex items-center gap-2 px-4 shadow-sm"
-                            >
-                                <Edit2 className="w-4 h-4" />
-                                <span className="text-xs font-bold uppercase tracking-wider">Редактировать</span>
-                            </button>
-                        ) : (
-                            <>
+                        {!readOnly && (
+                            !isEditing ? (
                                 <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all shadow-sm"
+                                    onClick={() => setIsEditing(true)}
+                                    className="p-2 rounded-full bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 hover:text-white transition-all flex items-center gap-2 px-4 shadow-sm"
                                 >
-                                    <X className="w-5 h-5" />
+                                    <Edit2 className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">Редактировать</span>
                                 </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    className="p-2 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 hover:text-emerald-100 transition-all flex items-center gap-2 px-4 shadow-sm"
-                                >
-                                    <Check className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">{isSaving ? 'Сохранение...' : 'Сохранить'}</span>
-                                </button>
-                            </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setIsEditing(false)}
+                                        className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all shadow-sm"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="p-2 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 hover:text-emerald-100 transition-all flex items-center gap-2 px-4 shadow-sm"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        <span className="text-xs font-bold uppercase tracking-wider">{isSaving ? 'Сохранение...' : 'Сохранить'}</span>
+                                    </button>
+                                </>
+                            )
                         )}
                         <button
                             onClick={onClose}
@@ -182,6 +209,15 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                         >
                             <X className="w-5 h-5" />
                         </button>
+                        {!readOnly && (
+                            <button
+                                onClick={() => setIsReservationModalOpen(true)}
+                                className="p-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-all flex items-center gap-2 px-4 shadow-lg shadow-emerald-500/20"
+                            >
+                                <ShoppingCart className="w-4 h-4" />
+                                <span className="text-xs font-bold uppercase tracking-wider">Bron Yaratish</span>
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-8">
@@ -218,11 +254,12 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                                             <SelectItem value="clinic">Клиника</SelectItem>
                                             <SelectItem value="hospital">Больница</SelectItem>
                                             <SelectItem value="lechebniy">Лечебное Учреждение</SelectItem>
+                                            <SelectItem value="wholesale" className="text-indigo-600 font-bold">Оптовая компания</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 ) : (
                                     <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-500/30">
-                                        {org.org_type === 'pharmacy' ? 'Аптека' : org.org_type === 'clinic' ? 'Клиника' : org.org_type === 'hospital' ? 'Больница' : 'Леч. Учреждение'}
+                                        {org.org_type === 'pharmacy' ? 'Аптека' : org.org_type === 'clinic' ? 'Клиника' : org.org_type === 'hospital' ? 'Больница' : org.org_type === 'wholesale' ? 'Оптовая компания' : 'Леч. Учреждение'}
                                     </span>
                                 )}
                                 <span className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-widest">
@@ -237,11 +274,12 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                 {/* Content Section */}
                 <div className="px-10 -mt-10 pb-10 space-y-8 relative z-10">
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                         {[
                             { label: "Бренд", field: 'brand', icon: Tag, color: "text-emerald-600", bg: "bg-emerald-50" },
                             { label: "Директор", field: 'director_name', icon: User, color: "text-blue-600", bg: "bg-blue-50" },
                             { label: "Телефон", field: 'contact_phone', icon: Phone, color: "text-indigo-600", bg: "bg-indigo-50" },
+                            { label: "ИНН", field: 'inn', icon: Info, color: "text-violet-600", bg: "bg-violet-50" },
                             { label: "Представитель", value: org.assigned_reps?.[0]?.full_name || 'Не назначен', icon: Globe, color: "text-amber-600", bg: "bg-amber-50" },
                         ].map((item, i) => (
                             <div key={i} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm transition-all duration-300 group">
@@ -297,7 +335,9 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                                                     className="font-bold text-slate-800"
                                                 />
                                             ) : (
-                                                <p className="text-sm font-bold text-slate-800 leading-relaxed">{org.address || "Адрес не указан"}</p>
+                                                <p className="text-sm font-bold text-slate-800 leading-relaxed">
+                                                    {geocodedAddress || org.address || "Адрес не указан"}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
@@ -380,12 +420,14 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                                 ) : (
                                     <div className="flex items-center gap-2">
                                         <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{doctors.length}</span>
-                                        <button
-                                            onClick={() => setIsAttachOpen(true)}
-                                            className="text-[10px] font-bold uppercase tracking-widest text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-200 flex items-center gap-1"
-                                        >
-                                            Прикрепить врача
-                                        </button>
+                                        {!readOnly && (
+                                            <button
+                                                onClick={() => setIsAttachOpen(true)}
+                                                className="text-[10px] font-bold uppercase tracking-widest text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-200 flex items-center gap-1"
+                                            >
+                                                Прикрепить врача
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -444,6 +486,18 @@ export function MedOrgDetailModal({ org, isOpen, onClose }: MedOrgDetailModalPro
                 salesPlans={viewDoctorPlans}
                 salesFacts={viewDoctorFacts}
                 bonusPayments={viewDoctorBonuses}
+            />
+
+            <CreateReservationModal
+                isOpen={isReservationModalOpen}
+                onClose={() => setIsReservationModalOpen(false)}
+                onSuccess={() => {
+                    // Optionally refresh stock/etc
+                    fetchOrgStock(org.id).then(data => setStock(data));
+                }}
+                initialOrgId={org.id}
+                initialOrgType={org.org_type}
+                initialMedRepId={org.assigned_reps?.[0]?.id}
             />
         </Dialog>
     );
